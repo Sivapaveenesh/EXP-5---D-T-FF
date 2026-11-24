@@ -15,41 +15,61 @@ Q(next) = T ⊕ Q   (Q(next) = Q if T = 0, Q(next) = Q' if T = 1)
 <img width="625" height="50" alt="image" src="https://github.com/user-attachments/assets/65034a51-5642-46ac-940a-f7ee975cea9c" />
 
 ## Design / RTL Program
-// gedit shift_reg.v
+// gedit dff_tff.v
 
-module shift_reg (
-    input wire        clk,   // clock
-    input wire        rst,   // asynchronous active-high reset
-    input wire        sin,   // serial input
-    output wire       sout,  // serial output (MSB, about to shift out)
-    output reg [3:0]  Q      // parallel output
+module dff (
+    input wire clk,   // clock
+    input wire rst,   // asynchronous active-high reset
+    input wire D,     // data input
+    output reg Q      // output
 );
 
     always @(posedge clk or posedge rst) begin
         if (rst)
-            Q <= 4'b0000;
+            Q <= 1'b0;
         else
-            Q <= {Q[2:0], sin};  // shift left, sin enters at LSB
+            Q <= D;
     end
+endmodule
 
-    assign sout = Q[3];
 
+module tff (
+    input wire clk,   // clock
+    input wire rst,   // asynchronous active-high reset
+    input wire T,     // toggle input
+    output reg Q      // output
+);
+
+    always @(posedge clk or posedge rst) begin
+        if (rst)
+            Q <= 1'b0;
+        else if (T)
+            Q <= ~Q;
+        else
+            Q <= Q;
+    end
 endmodule
 ## Testbench Program
-// gedit tb6.v
+// gedit tb5.v
 
-module tb6;
-    reg clk, rst, sin;
-    wire sout;
-    wire [3:0] Q;
+module tb5;
+    reg clk, rst, D, T;
+    wire Qd, Qt;
 
-    // Instantiate the shift register
-    shift_reg uut (
+    // Instantiate the D Flip-Flop
+    dff dff_uut (
         .clk(clk),
         .rst(rst),
-        .sin(sin),
-        .sout(sout),
-        .Q(Q)
+        .D(D),
+        .Q(Qd)
+    );
+
+    // Instantiate the T Flip-Flop
+    tff tff_uut (
+        .clk(clk),
+        .rst(rst),
+        .T(T),
+        .Q(Qt)
     );
 
     // ---- Clock generation: 10 time-unit period ----
@@ -58,30 +78,27 @@ module tb6;
 
     initial begin
         // ---- VCD dump setup ----
-        $dumpfile("shift_reg.vcd");   // name of the VCD file to be generated
-        $dumpvars(0, tb6);            // dump all signals in this testbench hierarchy
+        $dumpfile("dff_tff.vcd");   // name of the VCD file to be generated
+        $dumpvars(0, tb5);          // dump all signals in this testbench hierarchy
 
-        $monitor("Time=%0t rst=%b clk=%b sin=%b | Q=%b sout=%b",
-                 $time, rst, clk, sin, Q, sout);
+        $monitor("Time=%0t rst=%b clk=%b | D=%b Qd=%b | T=%b Qt=%b",
+                 $time, rst, clk, D, Qd, T, Qt);
 
         // ---- Apply asynchronous reset ----
-        rst = 1; sin = 0;
+        rst = 1; D = 0; T = 0;
         #7  rst = 0;
 
-        // ---- Serially shift in the bit pattern 1 0 1 1 ----
-        @(negedge clk); sin = 1;
-        @(negedge clk); sin = 0;
-        @(negedge clk); sin = 1;
-        @(negedge clk); sin = 1;
-
-        // ---- Hold sin = 0 and observe the pattern shift out ----
-        @(negedge clk); sin = 0;
-        @(negedge clk);
-        @(negedge clk);
+        // ---- Apply test vectors on successive clock edges ----
+        @(negedge clk); D = 1; T = 1;
+        @(negedge clk); D = 0; T = 1;
+        @(negedge clk); D = 1; T = 0;
+        @(negedge clk); D = 0; T = 0;
+        @(negedge clk); D = 1; T = 1;
+        @(negedge clk); D = 1; T = 1;
 
         // ---- Apply reset again mid-simulation ----
         @(negedge clk); rst = 1;
-        @(negedge clk); rst = 0; sin = 1;
+        @(negedge clk); rst = 0; D = 1; T = 1;
 
         #20 $finish;
     end
@@ -146,7 +163,9 @@ Q(next) = T ⊕ Q   (T Flip-Flop)
 The design was compiled and simulated using Synopsys VCS, and the functionality was verified using DVE waveform analysis, matching the expected truth table.
 
 **## Output**
-<img width="1920" height="1080" alt="Screenshot (57)" src="https://github.com/user-attachments/assets/eb4dde5b-e59b-4675-9a78-1416333b756c" />
+<img width="1920" height="1080" alt="Screenshot (59)" src="https://github.com/user-attachments/assets/f2ad9406-7bfa-42a7-a98e-6caf4bc152a1" />
+
+<img width="1920" height="1080" alt="Screenshot (60)" src="https://github.com/user-attachments/assets/0603fdb1-55bc-4044-aa3c-acaa3e3e5a5f" />
 
 
 ## Viva-Voce Questions
